@@ -1,27 +1,18 @@
 import { NextResponse } from "next/server";
-import fs from "fs/promises";
-import path from "path";
-
-const dataFilePath = path.join(process.cwd(), "data", "assignees.json");
-
-async function getAssignees() {
-  try {
-    const data = await fs.readFile(dataFilePath, "utf8");
-    return JSON.parse(data);
-  } catch (err: any) {
-    if (err.code === "ENOENT") {
-      await fs.writeFile(dataFilePath, "[]");
-      return [];
-    }
-    throw err;
-  }
-}
+import connectToDatabase from "@/lib/mongodb";
+import { Assignee } from "@/models/Assignee";
 
 export async function GET() {
   try {
-    const assignees = await getAssignees();
-    return NextResponse.json(assignees);
+    await connectToDatabase();
+
+    const assignees = await Assignee.find({}).sort({ name: 1 });
+    // Just return array of names to match existing frontend implementation `string[]`
+    const names = assignees.map((a) => a.name);
+
+    return NextResponse.json(names);
   } catch (error) {
+    console.error("GET assignees error", error);
     return NextResponse.json(
       { error: "Failed to fetch assignees" },
       { status: 500 },
@@ -31,6 +22,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    await connectToDatabase();
     const body = await request.json();
     const { name } = body;
 
@@ -38,21 +30,21 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid name" }, { status: 400 });
     }
 
-    const assignees = await getAssignees();
     const cleanName = name.trim();
 
-    if (assignees.includes(cleanName)) {
+    const existing = await Assignee.findOne({ name: cleanName });
+    if (existing) {
       return NextResponse.json(
         { error: "Assignee already exists" },
         { status: 400 },
       );
     }
 
-    assignees.push(cleanName);
-    await fs.writeFile(dataFilePath, JSON.stringify(assignees, null, 2));
+    await Assignee.create({ name: cleanName });
 
     return NextResponse.json({ name: cleanName }, { status: 201 });
   } catch (error) {
+    console.error("POST assignees error", error);
     return NextResponse.json(
       { error: "Failed to add assignee" },
       { status: 500 },

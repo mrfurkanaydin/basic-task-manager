@@ -20,12 +20,11 @@ const fetcher = (url: string) => fetch(url).then(res => res.json());
 
 export default function Home() {
   const { data: tasks, error, mutate } = useSWR<Task[]>('/api/tasks', fetcher, {
-    refreshInterval: 1000, // Poll every 1s for "real-time" feel
-    revalidateOnFocus: true,
+    revalidateOnFocus: true, // Sadece sekmeye/uygulamaya dönüldüğünde çeker
   });
 
   const { data: availableAssignees, mutate: mutateAssignees } = useSWR<string[]>('/api/assignees', fetcher, {
-    refreshInterval: 2000,
+    revalidateOnFocus: true,
   });
 
   const [newTaskText, setNewTaskText] = useState('');
